@@ -98,8 +98,6 @@ def _category_meta_map(options_json: Dict[str, Any]) -> Dict[str, Dict[str, str]
 
     default_menu_files = {
         "bitcoin": "Bitcoin.menu",
-        "nostr": "Nostr.menu",
-        "monero": "Monero.menu",
     }
 
     for cat in cats:
