@@ -29,11 +29,31 @@ import src.runner as runner                   # noqa: E402
 _BINFMT_DIR = Path("/proc/sys/fs/binfmt_misc")
 
 
+def _ensure_binfmt_mounted() -> None:
+    """binfmt_misc is not mounted in the container's mount namespace by
+    default; mounting it (privileged) exposes the VM kernel's global
+    entries, including the Rosetta interpreter registration."""
+    try:
+        if _BINFMT_DIR.is_dir() and any(_BINFMT_DIR.iterdir()):
+            return
+        if not _BINFMT_DIR.is_dir():
+            _BINFMT_DIR.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            ["sudo", "mount", "-t", "binfmt_misc", "binfmt_misc", str(_BINFMT_DIR)],
+            check=True, capture_output=True,
+        )
+    except Exception:
+        pass
+
+
 def _amd64_interpreter_paths() -> list:
+    _ensure_binfmt_mounted()
     out = []
-    if not _BINFMT_DIR.is_dir():
+    try:
+        entries = sorted(_BINFMT_DIR.iterdir())
+    except OSError:
         return out
-    for entry in sorted(_BINFMT_DIR.iterdir()):
+    for entry in entries:
         if entry.name in ("register", "status"):
             continue
         try:
@@ -64,7 +84,7 @@ def _bind_interpreters_into_chroot(cwd):
     for interp in _amd64_interpreter_paths():
         src = Path(interp)
         target = root / interp.lstrip("/")
-        if not src.is_dir() or target.exists():
+        if not src.exists() or target.exists():
             continue
         subprocess.run(["sudo", "mkdir", "-p", str(target)], check=True)
         subprocess.run(["sudo", "mount", "--bind", interp, str(target)], check=True)
