@@ -1,0 +1,21 @@
+DTails build manifest
+  base image : tails-amd64-7.15.1.img
+  base sha256: 32eba91c65cd184206eb7c8e9b504277442cf17aae7816815a1d9401e9736761
+  output     : DTails.img  (2677.0 MiB)
+  sha256     : c29031e37829ef71ac1844e05adca19f33f9821355b66d44f846d94c98375cb2
+  build epoch: 1231006505 (SOURCE_DATE_EPOCH — reproducible)
+
+  Installed (8):
+    + BIP39 (iancoleman) offline  v0.5.6
+    + Bisq  v1.10.8
+    + Bitcoin Core  v31.1
+    + Liana Wallet  v16.0rc1
+    + Mempool.space (web launcher)  v1.0
+    + Seedtool (offline)  v2.4.0
+    + Sparrow Wallet  v2.5.5
+    + Specter Desktop  v2.1.11
+  Removed (1):
+    - GIMP
+
+  Reproducible: the same base image + same selection rebuilds to the
+  same SHA256. Share this manifest so others can verify the hash.
