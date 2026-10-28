@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       kpartx \
       sudo=1.9.13p3-1+deb12u4 \
       wget=1.21.3-1+deb12u1 \
-      ca-certificates=20250419~deb12u1 \
+      ca-certificates \
       gpg \
       python3 \
     && rm -rf /var/lib/apt/lists/* \
