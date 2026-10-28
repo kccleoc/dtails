@@ -495,7 +495,10 @@ def _mount_and_prepare(local_image: str, logs: List[str], sink: Optional[Sink], 
         logs.append(_run_stream(f"sudo mount -o ro,loop,offset=1048576 '{local_image}' iso_mounted", sink, cwd))
 
     logs.append(_run_stream("rsync --exclude=/live/filesystem.squashfs -a iso_mounted/ future_iso", sink, cwd))
-    logs.append(_run_stream("sudo unsquashfs iso_mounted/live/filesystem.squashfs", sink, cwd))
+    unsquash = _run_stream("sudo unsquashfs iso_mounted/live/filesystem.squashfs", sink, cwd)
+    logs.append(unsquash)
+    if "[EXIT" in unsquash:
+        raise RuntimeError("unsquashfs failed; refusing to package an incomplete system image")
     logs.append(_run_stream("sudo mv squashfs-root/ system_to_edit", sink, cwd))
     logs.append(_run_stream("sudo mount --bind /run system_to_edit/run", sink, cwd))
     logs.append(_run_stream("sudo mount --bind /dev system_to_edit/dev", sink, cwd))
@@ -505,7 +508,10 @@ def _mount_and_prepare(local_image: str, logs: List[str], sink: Optional[Sink], 
 
 def _chroot_execute_script(logs: List[str], sink: Optional[Sink], cwd: str) -> None:
     _emit(sink, "[INFO] Running script in Chroot\n")
-    logs.append(_run_stream("sudo chroot system_to_edit /bin/bash -c 'bash /tmp/script'", sink, cwd))
+    chroot = _run_stream("sudo chroot system_to_edit /bin/bash -c 'bash /tmp/script'", sink, cwd)
+    logs.append(chroot)
+    if "[EXIT" in chroot:
+        raise RuntimeError("chroot install script failed; refusing to package a modified but uninstalled image")
 
 def _create_image_file_enabled() -> bool:
     return True   # Default: COMMENT THIS LINE TO DISABLE .img CREATION

@@ -142,7 +142,7 @@
   "remove_software": [
     {
       "name": "GIMP",
-      "internal_commands": "dpkg -r --force-depends gimp",
+      "internal_commands": "dpkg --purge --force-depends gimp gimp-data",
       "size": "160 MB"
     }
   ],

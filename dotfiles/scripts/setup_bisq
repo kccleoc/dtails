@@ -56,6 +56,6 @@ echo "---
       suppress: true" > /etc/onion-grater.d/bisq.yml
 
 echo "Edit Bisq executable file ..."
-sed -i 's+Exec=/opt/bisq/bin/Bisq+Exec=chmod o+r /var/run/tor/control.authcookie && /opt/bisq/bin/Bisq --torControlPort 9051 --torControlCookieFile=/var/run/tor/control.authcookie --torControlUseSafeCookieAuth+' /usr/share/applications/bisq-Bisq.desktop
+sed -i 's|Exec=/opt/bisq/bin/Bisq|Exec=sh -c "chmod o+r /var/run/tor/control.authcookie 2>/dev/null; exec /opt/bisq/bin/Bisq --torControlPort 9051 --torControlCookieFile=/var/run/tor/control.authcookie --torControlUseSafeCookieAuth"|' /usr/share/applications/bisq-Bisq.desktop
 sed -i 's+Categories=Network+Categories=Network;Bitcoin;+' /usr/share/applications/bisq-Bisq.desktop
 echo "Bisq installed successfully."
