@@ -8,6 +8,7 @@ mtools/dosfstools happen to be on the host, so mksquashfs/mkfs.fat output is
 byte-identical no matter which machine invokes the container.
 """
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -16,6 +17,73 @@ sys.path.insert(0, str(REPO))
 
 from src.state import AppState                # noqa: E402
 from src.runner import run_selected_actions_stream  # noqa: E402
+import src.runner as runner                   # noqa: E402
+
+# The Tails rootfs is amd64. On a foreign-arch host (e.g. Apple Silicon) the
+# chroot's amd64 binaries only run through the VM's binfmt emulator, whose
+# interpreter lives outside the chroot and would fail to resolve. Bind the
+# interpreter into the chroot for exactly the duration of the chroot step and
+# remove every trace afterwards, so the repacked squashfs is byte-identical to
+# a native-amd64 build.
+
+_BINFMT_DIR = Path("/proc/sys/fs/binfmt_misc")
+
+
+def _amd64_interpreter_paths() -> list:
+    out = []
+    if not _BINFMT_DIR.is_dir():
+        return out
+    for entry in sorted(_BINFMT_DIR.iterdir()):
+        if entry.name in ("register", "status"):
+            continue
+        try:
+            fields = entry.read_text().splitlines()
+        except OSError:
+            continue
+        kv = {}
+        for line in fields:
+            if ":" in line:
+                k, v = line.split(":", 1)
+                kv[k.strip()] = v.strip()
+            elif line.startswith(("interpreter", "magic")):
+                k, v = line.split(None, 1)
+                kv[k] = v
+        magic = kv.get("magic", "")
+        interp = kv.get("interpreter", "")
+        # ELF64 with e_machine == x86-64 (0x3e at byte offset 18).
+        if (interp and magic.startswith("7f454c4602010100")
+                and len(magic) >= 40 and magic[36:40] == "3e00"
+                and interp not in out):
+            out.append(interp)
+    return out
+
+
+def _bind_interpreters_into_chroot(cwd):
+    root = Path(cwd) / "system_to_edit"
+    binds = []
+    for interp in _amd64_interpreter_paths():
+        src = Path(interp)
+        target = root / interp.lstrip("/")
+        if not src.is_dir() or target.exists():
+            continue
+        subprocess.run(["sudo", "mkdir", "-p", str(target)], check=True)
+        subprocess.run(["sudo", "mount", "--bind", interp, str(target)], check=True)
+        binds.append((target, interp))
+    if not binds:
+        return None
+
+    def cleanup():
+        for target, _src in binds:
+            subprocess.run(["sudo", "umount", str(target)], check=False)
+            subprocess.run(["sudo", "rmdir", str(target)], check=False)
+            parent = target.parent
+            while parent != root:
+                if subprocess.run(["sudo", "rmdir", str(parent)],
+                                  check=False).returncode != 0:
+                    break
+                parent = parent.parent
+
+    return cleanup
 
 
 def main() -> int:
@@ -40,6 +108,18 @@ def main() -> int:
     def sink(text: str) -> None:
         sys.stdout.write(text)
         sys.stdout.flush()
+
+    _orig_chroot = runner._chroot_execute_script
+
+    def chroot_with_interpreters(logs, chroot_sink, cwd):
+        cleanup = _bind_interpreters_into_chroot(cwd)
+        try:
+            _orig_chroot(logs, chroot_sink, cwd)
+        finally:
+            if cleanup is not None:
+                cleanup()
+
+    runner._chroot_execute_script = chroot_with_interpreters
 
     run_selected_actions_stream(state, state.selected_image, sink=sink, cwd=str(REPO))
     return 0
